@@ -3,6 +3,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { Observable, isObservable, lastValueFrom } from 'rxjs';
@@ -16,11 +17,28 @@ export class SupabaseAuthGuard extends AuthGuard('supabase-jwt') {
   constructor(
     private readonly reflector: Reflector,
     private readonly supabaseAuthService: SupabaseAuthService,
+    private readonly configService: ConfigService,
   ) {
     super();
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // Bypass all auth if DISABLE_AUTH=true in env
+    const disableAuth = this.configService.get<string>('DISABLE_AUTH');
+    if (disableAuth && disableAuth.toLowerCase() === 'true') {
+      const request = context.switchToHttp().getRequest();
+      request.user = {
+        id: 'dev-user-id',
+        email: 'dev@example.com',
+        role: 'authenticated',
+        aud: 'authenticated',
+        appMetadata: { provider: 'email', providers: ['email'] },
+        userMetadata: { email: 'dev@example.com', email_verified: true },
+        rawClaims: {},
+      };
+      return true;
+    }
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
