@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: minecomplyapi
+    env: node
+    plan: free
+    autoDeploy: true
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Optionally pin Node version used by Render's build image
+      # - key: RENDER_NODE_VERSION
+      #   value: 20
+
+    # Uncomment to set a specific region (default is automatic)
+    # region: singapore
