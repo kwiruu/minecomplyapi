@@ -2,6 +2,7 @@ import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { SupabaseAuthService } from '../supabase-auth.service';
+import { ConfigService } from '@nestjs/config';
 
 describe('SupabaseAuthGuard', () => {
   const baseGuardPrototype = Object.getPrototypeOf(
@@ -14,6 +15,7 @@ describe('SupabaseAuthGuard', () => {
   let supabaseAuthService: SupabaseAuthService;
   let guard: SupabaseAuthGuard;
   let baseCanActivateSpy: jest.SpyInstance;
+  let configService: ConfigService;
 
   const createExecutionContext = (): ExecutionContext =>
     ({
@@ -30,7 +32,9 @@ describe('SupabaseAuthGuard', () => {
       getUserFromAccessToken: jest.fn().mockResolvedValue(null),
     } as unknown as SupabaseAuthService;
 
-    guard = new SupabaseAuthGuard(reflector, supabaseAuthService);
+    configService = { get: jest.fn().mockReturnValue(undefined) } as any;
+
+    guard = new SupabaseAuthGuard(reflector, supabaseAuthService, configService);
     baseCanActivateSpy = jest
       .spyOn(baseGuardPrototype, 'canActivate')
       .mockReturnValue(true);
