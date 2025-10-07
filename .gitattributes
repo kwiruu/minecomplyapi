@@ -1,0 +1,36 @@
+# Line ending handling for NestJS backend project
+* text=auto
+
+# Ensure these files always use LF (Unix) line endings
+*.md text eol=lf
+*.json text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+.env* text eol=lf
+
+# NestJS specific files
+*.config.js text eol=lf
+*.config.ts text eol=lf
+nest-cli.json text eol=lf
+tsconfig*.json text eol=lf
+.eslintrc.js text eol=lf
+.prettierrc text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+
+# Ensure these files always use CRLF (Windows) line endings
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary

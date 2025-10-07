@@ -1,0 +1,336 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  supabaseId         String              @unique
+  email              String?             @unique
+  displayName        String?
+  phoneNumber        String?
+  role               UserRole            @default(PROPONENT)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  organizations      UserOrganization[]
+  projectAssignments ProjectAssignment[]
+  submissions        Submission[]        @relation("SubmissionAuthor")
+  validations        ValidationSession[] @relation("ValidationReviewer")
+  generatedReports   Report[]            @relation("UserGeneratedReports")
+  signatures         DigitalSignature[]  @relation("UserSignatures")
+}
+
+model Organization {
+  id           String             @id @default(uuid())
+  name         String
+  type         OrganizationType   @default(PROPONENT)
+  description  String?
+  address      String?
+  contactEmail String?
+  contactPhone String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  projects     Project[]
+  members      UserOrganization[]
+}
+
+model UserOrganization {
+  id             String                     @id @default(uuid())
+  userId         String
+  organizationId String
+  role           OrganizationMembershipRole @default(CONTRIBUTOR)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  user           User                       @relation(fields: [userId], references: [id])
+  organization   Organization               @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, organizationId], name: "user_organization_unique")
+}
+
+model Project {
+  id             String                @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?
+  province       String?
+  municipality   String?
+  barangay       String?
+  latitude       Decimal?              @db.Decimal(10, 7)
+  longitude      Decimal?              @db.Decimal(10, 7)
+  eccNumber      String?
+  epepReference  String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  submissions    Submission[]
+  conditions     ComplianceCondition[]
+  assignments    ProjectAssignment[]
+
+  @@index([organizationId], map: "idx_project_organization")
+}
+
+model ProjectAssignment {
+  id        String                @id @default(uuid())
+  projectId String
+  userId    String
+  role      ProjectAssignmentRole
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  project   Project               @relation(fields: [projectId], references: [id])
+  user      User                  @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId, role], name: "unique_project_assignment")
+  @@index([userId], map: "idx_assignment_user")
+}
+
+model ComplianceCondition {
+  id               String             @id @default(uuid())
+  projectId        String
+  type             ConditionType      @default(ECC)
+  code             String?
+  description      String
+  frequency        String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  project          Project            @relation(fields: [projectId], references: [id])
+  complianceRecord ComplianceRecord[]
+
+  @@index([projectId], map: "idx_condition_project")
+}
+
+model Submission {
+  id                 String              @id @default(uuid())
+  projectId          String
+  submittedById      String?
+  status             SubmissionStatus    @default(DRAFT)
+  title              String
+  summary            String?
+  reportingFrom      DateTime?
+  reportingTo        DateTime?
+  submittedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  project            Project             @relation(fields: [projectId], references: [id])
+  submittedBy        User?               @relation("SubmissionAuthor", fields: [submittedById], references: [id])
+  complianceData     ComplianceRecord[]
+  evidences          Evidence[]          @relation("SubmissionEvidence")
+  validationSessions ValidationSession[]
+  reports            Report[]
+
+  @@index([projectId], map: "idx_submission_project")
+  @@index([submittedById], map: "idx_submission_author")
+}
+
+model ComplianceRecord {
+  id                  String               @id @default(uuid())
+  submissionId        String
+  conditionId         String?
+  category            ComplianceCategory
+  parameter           String
+  measuredValue       Decimal?             @db.Decimal(12, 4)
+  unit                String?
+  baselineValue       Decimal?             @db.Decimal(12, 4)
+  limitValue          Decimal?             @db.Decimal(12, 4)
+  recordedAt          DateTime?
+  locationDescription String?
+  latitude            Decimal?             @db.Decimal(10, 7)
+  longitude           Decimal?             @db.Decimal(10, 7)
+  notes               String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  submission          Submission           @relation(fields: [submissionId], references: [id])
+  condition           ComplianceCondition? @relation(fields: [conditionId], references: [id])
+  evidences           Evidence[]           @relation("RecordEvidence")
+  validationEntries   ValidationEntry[]
+
+  @@index([submissionId], map: "idx_record_submission")
+  @@index([conditionId], map: "idx_record_condition")
+}
+
+model Evidence {
+  id                 String            @id @default(uuid())
+  submissionId       String?
+  complianceRecordId String?
+  type               EvidenceType      @default(OTHER)
+  storageKey         String
+  fileName           String
+  fileType           String?
+  fileSize           Int?
+  capturedAt         DateTime?
+  latitude           Decimal?          @db.Decimal(10, 7)
+  longitude          Decimal?          @db.Decimal(10, 7)
+  metadata           Json?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  submission         Submission?       @relation("SubmissionEvidence", fields: [submissionId], references: [id])
+  complianceRecord   ComplianceRecord? @relation("RecordEvidence", fields: [complianceRecordId], references: [id])
+
+  @@index([submissionId], map: "idx_evidence_submission")
+  @@index([complianceRecordId], map: "idx_evidence_record")
+}
+
+model ValidationSession {
+  id           String            @id @default(uuid())
+  submissionId String
+  reviewerId   String
+  status       ValidationStatus  @default(IN_PROGRESS)
+  summary      String?
+  startedAt    DateTime          @default(now())
+  completedAt  DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  submission   Submission        @relation(fields: [submissionId], references: [id])
+  reviewer     User              @relation("ValidationReviewer", fields: [reviewerId], references: [id])
+  entries      ValidationEntry[]
+  reports      Report[]
+
+  @@index([submissionId], map: "idx_validation_submission")
+  @@index([reviewerId], map: "idx_validation_reviewer")
+}
+
+model ValidationEntry {
+  id                 String            @id @default(uuid())
+  validationId       String
+  complianceRecordId String?
+  status             ValidationOutcome @default(APPROVED)
+  fieldValue         Decimal?          @db.Decimal(12, 4)
+  fieldUnit          String?
+  comparisonData     Json?
+  notes              String?
+  recommendation     String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  validation         ValidationSession @relation(fields: [validationId], references: [id])
+  complianceRecord   ComplianceRecord? @relation(fields: [complianceRecordId], references: [id])
+
+  @@index([validationId], map: "idx_validation_entry_session")
+  @@index([complianceRecordId], map: "idx_validation_entry_record")
+}
+
+model Report {
+  id            String             @id @default(uuid())
+  submissionId  String?
+  validationId  String?
+  generatedById String?
+  reportType    ReportType
+  storageKey    String
+  metadata      Json?
+  generatedAt   DateTime           @default(now())
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  submission    Submission?        @relation(fields: [submissionId], references: [id])
+  validation    ValidationSession? @relation(fields: [validationId], references: [id])
+  generatedBy   User?              @relation("UserGeneratedReports", fields: [generatedById], references: [id])
+  signatures    DigitalSignature[]
+
+  @@index([submissionId], map: "idx_report_submission")
+  @@index([validationId], map: "idx_report_validation")
+}
+
+model DigitalSignature {
+  id           String   @id @default(uuid())
+  reportId     String
+  signedById   String
+  signatureUrl String
+  signedAt     DateTime @default(now())
+  deviceInfo   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  report       Report   @relation(fields: [reportId], references: [id])
+  signedBy     User     @relation("UserSignatures", fields: [signedById], references: [id])
+
+  @@index([reportId], map: "idx_signature_report")
+  @@index([signedById], map: "idx_signature_user")
+}
+
+enum UserRole {
+  PROPONENT
+  MMT
+  REGULATOR
+  ADMIN
+}
+
+enum OrganizationType {
+  PROPONENT
+  MMT
+  REGULATOR
+  GOVERNMENT
+  OTHER
+}
+
+enum OrganizationMembershipRole {
+  OWNER
+  MANAGER
+  CONTRIBUTOR
+  REVIEWER
+  OBSERVER
+}
+
+enum ProjectAssignmentRole {
+  PROPONENT_EDITOR
+  MMT_REVIEWER
+  REGULATOR_VIEWER
+}
+
+enum ConditionType {
+  ECC
+  EPEP
+  OTHER
+}
+
+enum ComplianceCategory {
+  AIR
+  WATER
+  NOISE
+  HAZARDOUS_WASTE
+  FINANCIAL
+  SOCIAL
+  INFRASTRUCTURE
+  BIODIVERSITY
+  OTHER
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REVISIONS_REQUIRED
+  ARCHIVED
+}
+
+enum ValidationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  NEEDS_INFORMATION
+}
+
+enum ValidationOutcome {
+  APPROVED
+  CONDITIONALLY_APPROVED
+  REQUIRES_CORRECTION
+  REJECTED
+  NOT_APPLICABLE
+}
+
+enum ReportType {
+  CMR
+  CMVR
+  SUMMARY
+  OTHER
+}
+
+enum EvidenceType {
+  PHOTO
+  VIDEO
+  DOCUMENT
+  AUDIO
+  DATASET
+  OTHER
+}
