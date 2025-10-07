@@ -34,7 +34,11 @@ describe('SupabaseAuthGuard', () => {
 
     configService = { get: jest.fn().mockReturnValue(undefined) } as any;
 
-    guard = new SupabaseAuthGuard(reflector, supabaseAuthService, configService);
+    guard = new SupabaseAuthGuard(
+      reflector,
+      supabaseAuthService,
+      configService,
+    );
     baseCanActivateSpy = jest
       .spyOn(baseGuardPrototype, 'canActivate')
       .mockReturnValue(true);
